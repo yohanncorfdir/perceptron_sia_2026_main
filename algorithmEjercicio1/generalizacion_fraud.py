@@ -24,10 +24,9 @@ def metricas(y_true, y_pred):
     f1        = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     return accuracy, precision, recall, f1
 
-# =============================================================
+
 # Carga y normalizacion
-# =============================================================
-df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../../data/fraud_dataset.csv'))
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/fraud_dataset.csv'))
 
 X = df.drop(columns=['flagged_fraud', 'big_model_fraud_probability']).values.astype(float)
 y = df['flagged_fraud'].values.astype(int)

@@ -11,7 +11,7 @@ Vamos a verificar potenciales corelaciones entre los datos
 Verificar si existen o no outliers
 '''
 # --- Carga de datos ---
-df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../../data/fraud_dataset.csv'))
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/fraud_dataset.csv'))
 
 features = df.drop(columns=['flagged_fraud']).columns.tolist()
 target   = 'flagged_fraud'

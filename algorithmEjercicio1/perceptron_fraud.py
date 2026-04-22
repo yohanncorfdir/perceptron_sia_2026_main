@@ -8,7 +8,7 @@ from perceptronSimpleLineal import PerceptronLineal
 from perceptronSimpleNoLineal import PerceptronNoLineal
 
 # --- Carga y normalizacion de TODAS las muestras ---
-df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../../data/fraud_dataset.csv'))
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/fraud_dataset.csv'))
 
 #Sacamos flagged_fraud and big_model_fraud_probability, el primero porque es el feature que queremos predecir y la segunda porque da informacion sobre la feature que queremos precedir con bigmodel
 X = df.drop(columns=['flagged_fraud','big_model_fraud_probability']).values.astype(float)

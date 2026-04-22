@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from mlp import MLP
 
 # Importar los datos
-DATA_DIR = os.path.join(os.path.dirname(__file__), '../../data')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 
 def cargar(path):
     df = pd.read_csv(path)
@@ -77,13 +77,9 @@ VARIANTES = [
     {"capas": [256, 128], "alpha": 0.05, "epochs": 50}, #Una capa de 256 y de 128
 ]
 
-# =============================================================
+
 # Variantes de arquitectura + tasa de aprendizaje (SGD)
-# =============================================================
 resultados = []
-print("\n" + "="*60)
-print("Variantes de arquitectura y tasa de aprendizaje (SGD)")
-print("="*60)
 for v in VARIANTES:
     nombre = f"sgd  ocultas={v['capas']}  alpha={v['alpha']}"
     print(f"\n>>> {nombre}")
@@ -105,11 +101,6 @@ for v in VARIANTES:
         "grupo": "SGD",
     })
 
-# =============================================================
-# Variantes de mecanismo de optimizacion (arquitectura fija)
-# La arquitectura [128, 64] con alpha=0.1 es nuestra referencia
-# Comparamos SGD vs Momentum vs Adam
-# =============================================================
 VARIANTES_OPT = [
     {"capas": [128, 64], "alpha": 0.1,   "opt": "sgd",      "epochs": 50},
     {"capas": [128, 64], "alpha": 0.1,   "opt": "momentum", "epochs": 50},
