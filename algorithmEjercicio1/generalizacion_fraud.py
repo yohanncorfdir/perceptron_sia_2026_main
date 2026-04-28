@@ -144,5 +144,5 @@ ax.set_ylim(0, 1.05)
 ax.grid(alpha=0.3)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_umbral.png'), dpi=150)
-plt.show()
+# plt.show()  <-- Comentado para evitar warnings en entornos no interactivos
 print("\nGrafico guardado: plot_umbral.png")

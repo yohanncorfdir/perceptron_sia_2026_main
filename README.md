@@ -418,11 +418,27 @@ Una inicialización adecuada previene que las activaciones colapsen a 0 o sature
 
 ### Requisitos
 
+El proyecto requiere las siguientes librerías de Python:
+- `numpy`
+- `pandas`
+- `matplotlib`
+
+Para instalarlas, se recomienda configurar un entorno virtual e instalar las dependencias con `pip`:
+
+```bash
+# 1. Crear entorno virtual (opcional pero recomendado)
+python3 -m venv venv
+
+# 2. Activar el entorno virtual
+source venv/bin/activate
+
+# 3. Instalar dependencias
+pip install numpy pandas matplotlib
 ```
-numpy
-pandas
-matplotlib
-```
+
+*(Si prefieres no usar un entorno virtual, puedes instalar las dependencias directamente ejecutando: `pip3 install numpy pandas matplotlib`)*.
+
+Asegúrate de ejecutar los scripts utilizando `python3` si tu sistema operativo (como Linux) por defecto apunta a otra versión de Python al utilizar el comando `python`.
 
 No se utilizan frameworks de deep learning (TensorFlow, PyTorch, scikit-learn). Todo está implementado desde cero con NumPy.
 

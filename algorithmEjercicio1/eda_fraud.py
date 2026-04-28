@@ -35,7 +35,7 @@ sns.heatmap(
 ax.set_title("Matriz de correlacion - fraud_dataset", fontsize=14, pad=12)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_correlacion.png'), dpi=150)
-plt.show()
+# plt.show()  <-- Comentado para evitar warnings en entornos no interactivos
 
 # --- Identificamos las 2 features mas correlacionadas con la variable objetivo ---
 corr_target = corr[target].drop(target).abs().sort_values(ascending=False)
@@ -44,8 +44,9 @@ print(f"Features mas correlacionadas con '{target}':")
 print(f"  1. {feat1}  (r = {corr[target][feat1]:.3f})")
 print(f"  2. {feat2}  (r = {corr[target][feat2]:.3f})\n")
 
-
-# =============================================================
+# --- Filtramos datos por clase para visualizacion ---
+fraud    = df[df[target] == 1]
+no_fraud = df[df[target] == 0]
 # BOXPLOTS: deteccion de outliers por variable
 # =============================================================
 n_cols = 3
@@ -76,6 +77,6 @@ for idx, col in enumerate(features):
 fig.suptitle("Boxplots por variable: No fraude vs Fraude", fontsize=14, y=1.01)
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_boxplots.png'),
             dpi=150, bbox_inches='tight')
-plt.show()
+# plt.show()
 
 print("Graficos guardados: plot_correlacion.png | plot_scatter.png | plot_boxplots.png")

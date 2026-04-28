@@ -6,7 +6,7 @@ import matplotlib.gridspec as gridspec
 import seaborn as sns
 
 # --- Carga de datos ---
-df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../../../data/fraud_dataset.csv'))
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../../data/fraud_dataset.csv'))
 
 features = df.drop(columns=['flagged_fraud']).columns.tolist()
 target   = 'flagged_fraud'
@@ -30,7 +30,7 @@ sns.heatmap(
 ax.set_title("Matriz de correlacion - fraud_dataset", fontsize=14, pad=12)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_correlacion.png'), dpi=150)
-plt.show()
+# plt.show()  <-- Comentado para evitar warnings en entornos no interactivos
 
 # --- Identificamos las 2 features mas correlacionadas con la variable objetivo ---
 corr_target = corr[target].drop(target).abs().sort_values(ascending=False)
@@ -56,7 +56,7 @@ ax.set_title(f"Scatterplot: {feat1} vs {feat2}\n(coloreado por {target})", fonts
 ax.legend(fontsize=10)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_scatter.png'), dpi=150)
-plt.show()
+# plt.show()
 
 # =============================================================
 # 3. BOXPLOTS: deteccion de outliers por variable
@@ -89,6 +89,6 @@ for idx, col in enumerate(features):
 fig.suptitle("Boxplots por variable: No fraude vs Fraude", fontsize=14, y=1.01)
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_boxplots.png'),
             dpi=150, bbox_inches='tight')
-plt.show()
+# plt.show()
 
 print("Graficos guardados en EDA/: plot_correlacion.png | plot_scatter.png | plot_boxplots.png")

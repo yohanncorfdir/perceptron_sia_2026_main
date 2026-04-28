@@ -166,7 +166,7 @@ ax.legend(fontsize=7, loc='lower right', ncol=2)
 ax.grid(alpha=0.3)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_curvas_sgd.png'), dpi=150)
-plt.show()
+#plt.show()
 
 # Grafico 2: comparacion de optimizadores (SGD vs Momentum vs Adam)
 colores_opt = {'SGD': 'steelblue', 'MOMENTUM': 'crimson', 'ADAM': 'seagreen'}
@@ -182,7 +182,7 @@ ax.legend(fontsize=8, loc='lower right')
 ax.grid(alpha=0.3)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_curvas_optimizadores.png'), dpi=150)
-plt.show()
+#plt.show()
 
 
 # Reporte y matriz de confusion del mejor modelo
@@ -202,6 +202,6 @@ for i in range(10):
 plt.colorbar(im, ax=ax)
 plt.tight_layout()
 plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_confusion.png'), dpi=150)
-plt.show()
+#plt.show()
 
 print("\nGraficos guardados: plot_curvas.png | plot_confusion.png")
