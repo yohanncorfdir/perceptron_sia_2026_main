@@ -43,6 +43,6 @@ class PerceptronNoLineal:
 			X = np.c_[X, np.ones((X.shape[0]))]
 		return self.sigmoid(X.dot(self.W))
 
-	def predict(self, X, threshold=0.5, addBias=True):
+	def predict(self, X, threshold=0.4, addBias=True):
 		# Aplicamos el umbral configurable para obtener una prediccion binaria
 		return (self.predict_proba(X, addBias=addBias) >= threshold).astype(int)

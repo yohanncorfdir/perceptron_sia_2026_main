@@ -11,7 +11,7 @@ Para print el digit 10
 python algorithm/algorithmEjercicio2/show_digit.py 10 digits.csv
 
 '''
-DATA_DIR = os.path.join(os.path.dirname(__file__), '../../data')
+DATA_DIR = os.path.join(os.path.dirname(__file__), '../data')
 
 def mostrar_digito(fila, archivo='digits.csv'):
     df = pd.read_csv(os.path.join(DATA_DIR, archivo))

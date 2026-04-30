@@ -158,6 +158,15 @@ class MLPv2:
                 self.W[i] -= alpha * mW_h / (np.sqrt(vW_h) + self.eps)
                 self.b[i] -= alpha * mb_h / (np.sqrt(vb_h) + self.eps)
 
+    # ---- Función de costo ----
+
+    def _cross_entropy(self, X, y):
+        """Cross-entropy (log-loss) promedio sobre el conjunto (X, y)."""
+        n_clases = self.capas[-1]
+        y_oh     = np.eye(n_clases)[y]
+        proba    = np.clip(self._forward(X)[-1], 1e-15, 1.0)
+        return -np.mean(np.sum(y_oh * np.log(proba), axis=1))
+
     # ---- Entrenamiento ----
 
     def fit(self, X, y, epochs=100, batch_size=64, X_val=None, y_val=None, verbose=True,
@@ -166,20 +175,22 @@ class MLPv2:
         paciencia  : numero de epochs consecutivas sin mejorar min_delta antes de parar.
                      None desactiva el early stopping.
         min_delta  : mejora minima (en fraccion, ej. 0.001 = 0.1%) para contar como progreso.
+
+        Retorna (hist_acc_train, hist_acc_val, hist_loss_train, hist_loss_val).
         """
         n_clases  = self.capas[-1]
         y_onehot  = np.eye(n_clases)[y]
         m = X.shape[0]
-        history_train, history_val = [], []
+        history_train,      history_val      = [], []
+        history_train_loss, history_val_loss = [], []
 
         # --- Estado del early stopping ---
-        mejor_acc_val   = -np.inf   # mejor exactitud de validacion vista hasta ahora
-        epochs_sin_mejora = 0       # contador de epochs consecutivas sin superar el umbral
+        mejor_acc_val     = -np.inf
+        epochs_sin_mejora = 0
 
         for epoch in range(1, epochs + 1):
 
             # --- Decaimiento de la tasa de aprendizaje ---
-            # Formula: alpha = alpha_ini / (1 + lr_decay * epoch)
             if self.lr_decay > 0:
                 self.alpha = self.alpha_ini / (1 + self.lr_decay * epoch)
 
@@ -191,26 +202,29 @@ class MLPv2:
                 self._backward(acts, y_onehot[batch])
 
             # --- Evaluacion tras cada epoch ---
-            acc_train = self.score(X, y)
+            acc_train  = self.score(X, y)
+            loss_train = self._cross_entropy(X, y)
             history_train.append(acc_train)
+            history_train_loss.append(loss_train)
 
             if X_val is not None:
-                acc_val = self.score(X_val, y_val)
+                acc_val  = self.score(X_val, y_val)
+                loss_val = self._cross_entropy(X_val, y_val)
                 history_val.append(acc_val)
+                history_val_loss.append(loss_val)
 
             # --- Visualizacion periodica ---
             if verbose and (epoch % 10 == 0 or epoch == 1):
-                msg = f"  [Epoch {epoch:>3}] train={acc_train*100:.2f}%"
+                msg = f"  [Epoch {epoch:>3}] train={acc_train*100:.2f}%  loss={loss_train:.4f}"
                 if X_val is not None:
-                    msg += f"  val={acc_val*100:.2f}%"
+                    msg += f"  val={acc_val*100:.2f}%  val_loss={loss_val:.4f}"
                 if self.lr_decay > 0:
                     msg += f"  lr={self.alpha:.5f}"
                 print(msg)
 
-            # --- Early stopping: solo activo si hay datos de validacion y paciencia definida ---
+            # --- Early stopping ---
             if paciencia is not None and X_val is not None:
                 if acc_val >= mejor_acc_val + min_delta:
-                    # Mejora suficiente: reiniciamos el contador
                     mejor_acc_val     = acc_val
                     epochs_sin_mejora = 0
                 else:
@@ -221,7 +235,7 @@ class MLPv2:
                                   f"durante {paciencia} epochs (mejor val: {mejor_acc_val*100:.2f}%)")
                         break
 
-        return history_train, history_val
+        return history_train, history_val, history_train_loss, history_val_loss
 
     def predict(self, X):
         return np.argmax(self._forward(X)[-1], axis=1)
