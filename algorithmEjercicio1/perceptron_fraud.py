@@ -10,15 +10,18 @@ from perceptronSimpleNoLineal import PerceptronNoLineal
 # --- Carga y normalizacion de TODAS las muestras ---
 df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/fraud_dataset.csv'))
 
-#Sacamos flagged_fraud and big_model_fraud_probability, el primero porque es el feature que queremos predecir y la segunda porque da informacion sobre la feature que queremos precedir con bigmodel
+# Usamos big_model_fraud_probability como target para Knowledge Distillation
+# El objetivo es que TinyModel aprenda a replicar la salida de BigModel
 X = df.drop(columns=['flagged_fraud','big_model_fraud_probability']).values.astype(float)
-y = df['flagged_fraud'].values.astype(int)
+y = df['big_model_fraud_probability'].values.astype(float)
+y_binary = df['flagged_fraud'].values.astype(int)
 
 X = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0) + 1e-8)
 
 EPOCHS = 20
 print(f"Conjunto de datos: {len(X)} muestras, {X.shape[1]} variables de entrada")
-print(f"Fraudes: {y.sum()} ({y.mean()*100:.1f}%) | No fraudes: {(1-y).sum()} ({(1-y).mean()*100:.1f}%)")
+print(f"Target: Knowledge Distillation (replicar BigModel)")
+print(f"Media de probabilidad de BigModel: {y.mean():.4f}")
 
 
 # Estudio del potencial de aprendizaje (todas las muestras)
@@ -28,36 +31,36 @@ pnl = PerceptronNoLineal(X.shape[1], alpha=0.1)
 hist_lin,  _ = pl.fit(X, y, epochs=EPOCHS)
 hist_nolin, _ = pnl.fit(X, y, epochs=EPOCHS)
 
-print(f"\n{'Epoch':<8} {'Lineal (acc %)':<22} {'No Lineal (acc %)':<22}")
+print(f"\n{'Epoch':<8} {'Lineal (MSE)':<22} {'No Lineal (MSE)':<22}")
 
 
-for i, (a_lin, a_nolin) in enumerate(zip(hist_lin, hist_nolin), 1):
-    print(f"{i:<8} {a_lin*100:<22.2f} {a_nolin*100:<22.2f}")
+for i, (mse_lin, mse_nolin) in enumerate(zip(hist_lin, hist_nolin), 1):
+    print(f"{i:<8} {mse_lin:<22.6f} {mse_nolin:<22.6f}")
 
-print(f"\nExactitud Lineal:    {hist_lin[-1]*100:.2f}%")
-print(f"Exactitud No Lineal: {hist_nolin[-1]*100:.2f}%")
+print(f"\nMSE Final Lineal:    {hist_lin[-1]:.6f}")
+print(f"MSE Final No Lineal: {hist_nolin[-1]:.6f}")
 
 # --- Analisis: underfitting y saturacion ---
 
-# Underfitting: exactitud baja incluso sobre los datos de entrenamiento
-umbral_underfitting = 0.80
+# Underfitting: MSE alto incluso sobre los datos de entrenamiento
+umbral_underfitting_mse = 0.05
 for nombre, hist in [("Lineal", hist_lin), ("No Lineal", hist_nolin)]:
-    if max(hist) < umbral_underfitting:
-        print(f"{nombre}: UNDERFITTING detectado (exactitud maxima = {max(hist)*100:.2f}%)")
+    if min(hist) > umbral_underfitting_mse:
+        print(f"{nombre}: UNDERFITTING detectado (MSE minimo = {min(hist):.6f})")
     else:
-        print(f"{nombre}: Sin underfitting (exactitud maxima = {max(hist)*100:.2f}%)")
+        print(f"{nombre}: Sin underfitting (MSE minimo = {min(hist):.6f})")
 
-# Saturacion: la exactitud deja de mejorar
+# Saturacion: el MSE deja de mejorar
 for nombre, hist in [("Lineal", hist_lin), ("No Lineal", hist_nolin)]:
-    mejora = max(hist) - hist[0]
+    mejora = hist[0] - min(hist)
     ultimas = hist[-5:]
     rango_final = max(ultimas) - min(ultimas)
-    if rango_final < 0.005:
-        print(f"{nombre}: SATURACION detectada (variacion en ultimas 5 epochs = {rango_final*100:.3f}%)")
+    if rango_final < 0.0001:
+        print(f"{nombre}: SATURACION detectada (variacion en ultimas 5 epochs = {rango_final:.6f})")
     else:
-        print(f"{nombre}: Sin saturacion (progresion {hist[0]*100:.2f}% -> {hist[-1]*100:.2f}%)")
+        print(f"{nombre}: Sin saturacion (progresion MSE {hist[0]:.6f} -> {hist[-1]:.6f})")
 
 # Seleccion del modelo para estudio de generalizacion
-mejor = "No Lineal" if hist_nolin[-1] >= hist_lin[-1] else "Lineal"
+mejor = "No Lineal" if hist_nolin[-1] <= hist_lin[-1] else "Lineal"
 print(f"Modelo seleccionado para generalizacion: {mejor}")
 

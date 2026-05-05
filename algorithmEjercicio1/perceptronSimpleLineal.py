@@ -6,35 +6,53 @@ class PerceptronLineal:
 		self.W = np.random.randn(N + 1) / np.sqrt(N)
 		self.alpha = alpha
 
-	def step(self, x):
-		# Funcion de activacion lineal: retorna 0 o 1
-		return 1 if x > 0 else 0
+	def activation(self, x):
+		# Funcion de activacion lineal: f(z) = z (identidad)
+		return x
 
 	def fit(self, X, y, epochs=20, X_val=None, y_val=None):
 		# Agregamos el sesgo (bias) como ultima columna de X
 		X = np.c_[X, np.ones((X.shape[0]))]
 		if X_val is not None:
 			X_val_b = np.c_[X_val, np.ones((X_val.shape[0]))]
+		
 		history_train = []
 		history_val = []
+		
 		for epoch in np.arange(0, epochs):
-			for (x, target) in zip(X, y):
-				p = self.step(np.dot(x, self.W))
-				# Solo actualizamos los pesos si la prediccion es incorrecta
-				if p != target:
-					error = p - target
-					self.W += -self.alpha * error * x
-			# Exactitud sobre el conjunto de entrenamiento
-			preds_train = np.array([self.step(np.dot(x, self.W)) for x in X])
-			history_train.append(np.mean(preds_train == y))
-			# Exactitud sobre el conjunto de validacion (si se proporciona)
+			# Barajamos los datos en cada epoch para un entrenamiento mas estable (SGD)
+			indices = np.arange(len(X))
+			np.random.shuffle(indices)
+			
+			for i in indices:
+				xi = X[i]
+				target = y[i]
+				# Forward pass
+				p = self.activation(np.dot(xi, self.W))
+				# Update rule for MSE: W = W - alpha * (p - target) * xi
+				error = p - target
+				self.W += -self.alpha * error * xi
+			
+			# Calculo de MSE sobre el conjunto de entrenamiento
+			preds_train = self.activation(np.dot(X, self.W))
+			mse_train = np.mean((preds_train - y)**2)
+			history_train.append(mse_train)
+			
+			# Calculo de MSE sobre el conjunto de validacion (si se proporciona)
 			if X_val is not None:
-				preds_val = np.array([self.step(np.dot(x, self.W)) for x in X_val_b])
-				history_val.append(np.mean(preds_val == y_val))
+				preds_val = self.activation(np.dot(X_val_b, self.W))
+				mse_val = np.mean((preds_val - y_val)**2)
+				history_val.append(mse_val)
+				
 		return history_train, history_val
 
-	def predict(self, X, addBias=True):
+	def predict_proba(self, X, addBias=True):
+		# Retorna la salida lineal continua
 		X = np.atleast_2d(X)
 		if addBias:
 			X = np.c_[X, np.ones((X.shape[0]))]
-		return self.step(np.dot(X, self.W))
+		return self.activation(np.dot(X, self.W))
+
+	def predict(self, X, threshold=0.5, addBias=True):
+		# Aplicamos un umbral para obtener una prediccion binaria
+		return (self.predict_proba(X, addBias=addBias) >= threshold).astype(int)
