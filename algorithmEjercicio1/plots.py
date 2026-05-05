@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
@@ -27,6 +29,12 @@ def bce(y_true, proba):
 def tasa_error(y_true, y_pred):
     """Tasa de error / MSE binaria (PerceptronLineal)."""
     return np.mean((y_pred - y_true) ** 2)
+
+def r2_score(y_true, y_pred):
+    """Calcula el coeficiente de determinación R2."""
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    return 1 - (ss_res / (ss_tot + 1e-8))
 
 
 # ── Helpers de intervalos de confianza ────────────────────────────────────────
@@ -146,7 +154,6 @@ def graficar_costo(epochs_range,
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
     print(f"Gráfico guardado: {save_path}")
 
 
@@ -164,7 +171,6 @@ def graficar_confusion(tp_lin, tn_lin, fp_lin, fn_lin, acc_lin, f1_lin, rec_lin,
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
     print(f"Gráfico guardado: {save_path}")
 
 
@@ -196,7 +202,6 @@ def graficar_umbral(thresholds, precisiones, recalls, f1s, mejor_umbral, save_pa
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
     print(f"Gráfico guardado: {save_path}")
 
 
@@ -216,7 +221,12 @@ def graficar_roc(probas_test, y_test, rec_nol, mejor_umbral, save_path, n_bootst
     orden      = np.argsort(fpr_list)
     fpr_sorted = np.array(fpr_list)[orden]
     tpr_sorted = np.array(tpr_list)[orden]
-    auc        = np.trapz(tpr_sorted, fpr_sorted)
+    
+    # Compatibilidad con NumPy 2.x (trapz fue movido a trapezoid)
+    if hasattr(np, 'trapezoid'):
+        auc = np.trapezoid(tpr_sorted, fpr_sorted)
+    else:
+        auc = np.trapz(tpr_sorted, fpr_sorted)
 
     fpr_grid, tpr_lo, tpr_hi = _bootstrap_ci_roc(probas_test, y_test, n=n_bootstrap)
 
@@ -239,7 +249,6 @@ def graficar_roc(probas_test, y_test, rec_nol, mejor_umbral, save_path, n_bootst
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
     print(f"Gráfico guardado: {save_path}")
 
 
@@ -263,7 +272,6 @@ def graficar_histograma_prob(probas_test, y_test, mejor_umbral, save_path):
     ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
     print(f"Gráfico guardado: {save_path}")
 
 
@@ -297,7 +305,6 @@ def graficar_importancia(pesos_lin, pesos_nol, nombres_features, save_path,
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
     print(f"Gráfico guardado: {save_path}")
 
 
@@ -334,5 +341,49 @@ def graficar_comparacion_metricas(vals_lin, vals_nol, save_path,
     ax.grid(axis='y', alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
-    plt.show()
+    print(f"Gráfico guardado: {save_path}")
+
+
+def graficar_mse_epochs(hist_lin, hist_nolin, save_path):
+    """Grafica el MSE vs Épocas para ambos modelos durante el entrenamiento."""
+    fig, ax = plt.subplots(figsize=(9, 5))
+    epochs = np.arange(1, len(hist_lin) + 1)
+    
+    ax.plot(epochs, hist_lin, 'o-', color='steelblue', label='Perceptrón Lineal')
+    ax.plot(epochs, hist_nolin, 's-', color='crimson', label='Perceptrón No Lineal')
+    
+    ax.set_title('Evolución del MSE durante el Entrenamiento', fontsize=13, fontweight='bold')
+    ax.set_xlabel('Época', fontsize=11)
+    ax.set_ylabel('Mean Squared Error (MSE)', fontsize=11)
+    ax.legend(fontsize=10)
+    ax.grid(alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    print(f"Gráfico guardado: {save_path}")
+
+
+def graficar_costo_economico(thresholds, total_costs, missed_fraud_costs, false_positive_costs, mejor_umbral, save_path):
+    """Grafica el impacto económico (pérdidas en USD) vs Umbral."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    ax.plot(thresholds, total_costs, 'o-', color='black', lw=2, label='Pérdida Total')
+    ax.fill_between(thresholds, 0, missed_fraud_costs, color='crimson', alpha=0.3, label='Costo Fraudes Omitidos (FN)')
+    ax.fill_between(thresholds, missed_fraud_costs, total_costs, color='steelblue', alpha=0.3, label='Costo Bloqueos Erróneos (FP)')
+    
+    ax.axvline(mejor_umbral, color='red', linestyle='--', alpha=0.8, 
+               label=f'Umbral Económico Óptimo = {mejor_umbral:.2f}')
+    
+    ax.set_title('Impacto Económico vs Umbral de Detección', fontsize=13, fontweight='bold')
+    ax.set_xlabel('Umbral de detección', fontsize=11)
+    ax.set_ylabel('Pérdidas Estimadas (USD)', fontsize=11)
+    ax.legend(fontsize=10)
+    ax.grid(alpha=0.3)
+    
+    # Formatear el eje Y para mostrar miles si es necesario
+    from matplotlib.ticker import FuncFormatter
+    ax.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
     print(f"Gráfico guardado: {save_path}")

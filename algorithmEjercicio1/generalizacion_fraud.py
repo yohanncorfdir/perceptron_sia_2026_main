@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from perceptronSimpleNoLineal import PerceptronNoLineal
+import plots
 
 
 # Funciones de metricas 
@@ -28,6 +29,9 @@ def metricas(y_true, y_pred):
 # Carga y normalizacion
 df = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/fraud_dataset.csv'))
 
+# Guardamos amount_usd para el análisis económico
+amount_usd = df['amount_usd'].values.astype(float)
+
 # Usamos big_model_fraud_probability como target para Knowledge Distillation
 X = df.drop(columns=['flagged_fraud', 'big_model_fraud_probability']).values.astype(float)
 y = df['big_model_fraud_probability'].values.astype(float)
@@ -35,7 +39,10 @@ y_binary = df['flagged_fraud'].values.astype(int)
 
 X = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0) + 1e-8)
 
-EPOCHS = 20
+# Calidad del BigModel (K-Fold completo)
+r2_big = plots.r2_score(y_binary, y)
+print(f"Calidad del BigModel (General): R2 = {r2_big:.4f}")
+EPOCHS = 30
 K      = 5
 
 print(f"Modelo: PerceptronNoLineal | Epochs: {EPOCHS} | K-Fold: {K}")
@@ -109,44 +116,58 @@ y_test_real = y_binary[split:]         # Ground truth para evaluacion
 modelo_final = PerceptronNoLineal(X_train.shape[1], alpha=0.1)
 modelo_final.fit(X_train, y_train, epochs=EPOCHS)
 
-# Barrido de umbrales
-thresholds  = np.arange(0.1, 0.91, 0.05)
+# --- Análisis Económico ---
+# Costo de oportunidad: 10% del monto si bloqueamos por error (FP)
+# Costo de pérdida directa: 100% del monto si omitimos un fraude (FN)
+FACTOR_FP = 0.1 
+
+amounts_test = amount_usd[split:]
+y_test_proba = modelo_final.predict_proba(X_test).flatten()
+
+thresholds = np.linspace(0.01, 0.99, 50)
 precisiones, recalls, f1s = [], [], []
+total_costs, fn_costs, fp_costs = [], [], []
 
 for t in thresholds:
-    y_pred = modelo_final.predict(X_test, threshold=t)
+    y_pred = (y_test_proba >= t).astype(int)
+    
+    # Métricas estándar
     _, prec, rec, f1 = metricas(y_test_real, y_pred)
     precisiones.append(prec)
     recalls.append(rec)
     f1s.append(f1)
+    
+    # Cálculo económico
+    fp_idx = (y_pred == 1) & (y_test_real == 0)
+    fn_idx = (y_pred == 0) & (y_test_real == 1)
+    
+    cost_fp = np.sum(amounts_test[fp_idx]) * FACTOR_FP
+    cost_fn = np.sum(amounts_test[fn_idx])
+    
+    fp_costs.append(cost_fp)
+    fn_costs.append(cost_fn)
+    total_costs.append(cost_fp + cost_fn)
 
-mejor_idx    = np.argmax(f1s)
-mejor_umbral = thresholds[mejor_idx]
+mejor_idx_f1 = np.argmax(f1s)
+mejor_idx_eco = np.argmin(total_costs)
 
-print(f"\n{'Umbral':<10} {'Precision':<12} {'Recall':<10} {'F1':<10}")
+umbral_f1  = thresholds[mejor_idx_f1]
+umbral_eco = thresholds[mejor_idx_eco]
 
-for t, p, r, f in zip(thresholds, precisiones, recalls, f1s):
-    marca = " <-- OPTIMO (F1)" if abs(t - mejor_umbral) < 0.001 else ""
-    print(f"{t:<10.2f} {p:<12.3f} {r:<10.3f} {f:<10.3f}{marca}")
+print(f"\n{'Umbral':<10} {'F1-Score':<10} {'Pérdida USD':<15}")
+print("-" * 40)
+for i in [0, 10, 20, 30, 40, 49]: # Muestra representativa
+    t, f, c = thresholds[i], f1s[i], total_costs[i]
+    print(f"{t:<10.2f} {f:<10.3f} ${c:<14,.0f}")
 
-print(f"\nUmbral recomendado para CompanyX: {mejor_umbral:.2f}")
-print(f"  -> F1={f1s[mejor_idx]:.3f} | Precision={precisiones[mejor_idx]:.3f} | Recall={recalls[mejor_idx]:.3f}")
+print(f"\nResultados del Análisis:")
+print(f"  -> Umbral óptimo por F1: {umbral_f1:.2f} (Pérdida: ${total_costs[mejor_idx_f1]:,.0f})")
+print(f"  -> Umbral óptimo ECONÓMICO: {umbral_eco:.2f} (Pérdida: ${total_costs[mejor_idx_eco]:,.0f})")
 
+# Graficamos el impacto económico
+plots.graficar_costo_economico(thresholds, total_costs, fn_costs, fp_costs, umbral_eco, 
+                               os.path.join(os.path.dirname(__file__), 'plot_costo_economico.png'))
 
-# --- Grafico Precision / Recall / F1 vs Umbral ---
-fig, ax = plt.subplots(figsize=(9, 5))
-ax.plot(thresholds, precisiones, 'o-', color='steelblue',  label='Precision')
-ax.plot(thresholds, recalls,     's-', color='crimson',    label='Recall')
-ax.plot(thresholds, f1s,         '^-', color='seagreen',   label='F1-Score')
-ax.axvline(mejor_umbral, color='gray', linestyle='--', alpha=0.7,
-           label=f'Umbral optimo = {mejor_umbral:.2f}')
-ax.set_xlabel('Umbral de deteccion', fontsize=11)
-ax.set_ylabel('Valor de la metrica', fontsize=11)
-ax.set_title('Precision / Recall / F1 segun el umbral de deteccion de fraude', fontsize=12)
-ax.legend(fontsize=10)
-ax.set_ylim(0, 1.05)
-ax.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig(os.path.join(os.path.dirname(__file__), 'plot_umbral.png'), dpi=150)
-# plt.show()  <-- Comentado para evitar warnings en entornos no interactivos
-print("\nGrafico guardado: plot_umbral.png")
+# Graficamos métricas estándar vs umbral
+plots.graficar_umbral(thresholds, precisiones, recalls, f1s, umbral_f1, 
+                      os.path.join(os.path.dirname(__file__), 'plot_umbral.png'))

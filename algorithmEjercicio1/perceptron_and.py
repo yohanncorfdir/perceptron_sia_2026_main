@@ -1,5 +1,5 @@
 # import the necessary packages
-from perceptronSimpleLineal import Perceptron
+from perceptronSimpleLineal import PerceptronLineal as Perceptron
 import numpy as np
 # construct the AND dataset
 X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
