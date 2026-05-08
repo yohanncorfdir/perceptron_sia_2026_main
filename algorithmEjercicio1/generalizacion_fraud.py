@@ -42,8 +42,9 @@ X = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0) + 1e-8)
 # Calidad del BigModel (K-Fold completo)
 r2_big = plots.r2_score(y_binary, y)
 print(f"Calidad del BigModel (General): R2 = {r2_big:.4f}")
-EPOCHS = 30
-K      = 5
+EPOCHS     = 30
+K          = 5
+UMBRAL_KD  = 0.49   # umbral con mayor acuerdo con BigModel
 
 print(f"Modelo: PerceptronNoLineal | Epochs: {EPOCHS} | K-Fold: {K}")
 print(f"Muestras: {len(X)} | Target: Knowledge Distillation")
@@ -86,7 +87,7 @@ for k in range(K):
     mse = np.mean((y_prob - y_test)**2)
     
     # Prediccion binaria para metricas de clasificacion contra ground truth real
-    y_pred = modelo.predict(X_test, threshold=0.5)
+    y_pred = modelo.predict(X_test, threshold=UMBRAL_KD)
     acc, prec, rec, f1 = metricas(y_test_binary, y_pred)
     
     resultados.append((mse, acc, prec, rec, f1))
@@ -160,14 +161,41 @@ for i in [0, 10, 20, 30, 40, 49]: # Muestra representativa
     t, f, c = thresholds[i], f1s[i], total_costs[i]
     print(f"{t:<10.2f} {f:<10.3f} ${c:<14,.0f}")
 
+idx_kd = np.argmin(np.abs(thresholds - UMBRAL_KD))
 print(f"\nResultados del Análisis:")
-print(f"  -> Umbral óptimo por F1: {umbral_f1:.2f} (Pérdida: ${total_costs[mejor_idx_f1]:,.0f})")
-print(f"  -> Umbral óptimo ECONÓMICO: {umbral_eco:.2f} (Pérdida: ${total_costs[mejor_idx_eco]:,.0f})")
+print(f"  -> Umbral KD (acuerdo BigModel): {UMBRAL_KD:.2f} (Pérdida: ${total_costs[idx_kd]:,.0f})")
+print(f"  -> Umbral óptimo por F1:         {umbral_f1:.2f} (Pérdida: ${total_costs[mejor_idx_f1]:,.0f})")
+print(f"  -> Umbral óptimo ECONÓMICO:      {umbral_eco:.2f} (Pérdida: ${total_costs[mejor_idx_eco]:,.0f})")
 
 # Graficamos el impacto económico
 plots.graficar_costo_economico(thresholds, total_costs, fn_costs, fp_costs, umbral_eco, 
                                os.path.join(os.path.dirname(__file__), 'plot_costo_economico.png'))
 
-# Graficamos métricas estándar vs umbral
-plots.graficar_umbral(thresholds, precisiones, recalls, f1s, umbral_f1, 
+# Graficamos métricas estándar vs umbral (marcamos UMBRAL_KD)
+plots.graficar_umbral(thresholds, precisiones, recalls, f1s, UMBRAL_KD,
                       os.path.join(os.path.dirname(__file__), 'plot_umbral.png'))
+
+# Matriz de confusión — umbral KD (acuerdo máximo con BigModel)
+y_pred_kd = (y_test_proba >= UMBRAL_KD).astype(int)
+acc_kd, prec_kd, rec_kd, f1_kd = metricas(y_test_real, y_pred_kd)
+tp_kd, tn_kd, fp_kd, fn_kd = confusion_matrix(y_test_real, y_pred_kd)
+
+fig, ax = plt.subplots(figsize=(6, 5))
+fig.suptitle('Matriz de Confusión — Modelo Final vs flagged_fraud',
+             fontsize=13, fontweight='bold')
+plots._panel_confusion(ax, tp_kd, tn_kd, fp_kd, fn_kd,
+                       f'Umbral KD ({UMBRAL_KD})\n'
+                       f'Acc={acc_kd*100:.1f}%  F1={f1_kd:.3f}  Recall={rec_kd:.3f}')
+plt.tight_layout()
+_path_cm = os.path.join(os.path.dirname(__file__), 'plot_confusion.png')
+plt.savefig(_path_cm, dpi=150)
+print(f"Gráfico guardado: {_path_cm}")
+print(f"Umbral KD {UMBRAL_KD} — Acc={acc_kd*100:.1f}%  Precisión={prec_kd:.3f}  Recall={rec_kd:.3f}  F1={f1_kd:.3f}")
+
+# Curva ROC (punto marcado = UMBRAL_KD)
+plots.graficar_roc(y_test_proba, y_test_real, rec_kd, UMBRAL_KD,
+                   os.path.join(os.path.dirname(__file__), 'plot_roc.png'))
+
+# Histograma de probabilidades predichas
+plots.graficar_histograma_prob(y_test_proba, y_test_real, UMBRAL_KD,
+                               os.path.join(os.path.dirname(__file__), 'plot_histograma_prob.png'))

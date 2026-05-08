@@ -804,3 +804,159 @@ plt.tight_layout()
 plt.savefig(os.path.join(DIR, 'plot_dashboard_progresion.png'), dpi=150)
 plt.show()
 print("Gráfico guardado: plot_dashboard_progresion.png")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Gráfico comparativo — Todos los modelos individuales
+# ══════════════════════════════════════════════════════════════════════════════
+
+etiqueta_map = {
+    "Ref: sigmoid [256,128] adam  sin aug":           "Sigmoid\n[256,128]\nsin aug",
+    "ReLU      [256,128] adam  sin aug":              "ReLU\n[256,128]\nsin aug",
+    "ReLU      [512,256] adam  sin aug":              "ReLU\n[512,256]\nsin aug",
+    "ReLU      [256,128] adam  CON aug":              "ReLU\n[256,128]\nCON aug",
+    "ReLU      [512,256] adam  CON aug + decay":      "ReLU\n[512,256]\naug+decay",
+    "ReLU      [256,128] adam  CON aug + CV":         "ReLU\n[256,128]\nCV",
+    "ReLU      [512,256] adam  CON aug + CV + decay": "ReLU\n[512,256]\nCV+decay",
+}
+
+def _etiq(nombre):
+    return etiqueta_map.get(nombre, nombre[:25])
+
+todos_labels  = []
+todos_accs    = []
+todos_lo_err  = []
+todos_hi_err  = []
+todos_colores = []
+
+for r in resultados_base:
+    y_pred_r = r['modelo'].predict(X_test)
+    lo, hi   = _bootstrap_ci_acc(y_test, y_pred_r)
+    todos_labels.append(_etiq(r['nombre']))
+    todos_accs.append(r['acc_test'] * 100)
+    todos_lo_err.append(r['acc_test'] * 100 - lo)
+    todos_hi_err.append(hi - r['acc_test'] * 100)
+    todos_colores.append('steelblue')
+
+for r in resultados_aug:
+    y_pred_r = r['modelo'].predict(X_test)
+    lo, hi   = _bootstrap_ci_acc(y_test, y_pred_r)
+    todos_labels.append(_etiq(r['nombre']))
+    todos_accs.append(r['acc_test'] * 100)
+    todos_lo_err.append(r['acc_test'] * 100 - lo)
+    todos_hi_err.append(hi - r['acc_test'] * 100)
+    todos_colores.append('darkorange')
+
+for nombre in nombres_cv:
+    accs_v = [r['acc_test'] * 100 for r in resultados_cv if r['nombre'] == nombre]
+    media  = np.mean(accs_v)
+    std    = np.std(accs_v)
+    todos_labels.append(_etiq(nombre))
+    todos_accs.append(media)
+    todos_lo_err.append(std)
+    todos_hi_err.append(std)
+    todos_colores.append('seagreen')
+
+x_all = np.arange(len(todos_labels))
+fig_all, ax_all = plt.subplots(figsize=(13, 6))
+barras_all = ax_all.bar(
+    x_all, todos_accs, color=todos_colores, alpha=0.85, width=0.55,
+    yerr=[todos_lo_err, todos_hi_err],
+    error_kw={'elinewidth': 2, 'capsize': 6, 'ecolor': 'dimgray'}
+)
+ax_all.axhline(98, color='black', linestyle='--', linewidth=1.5, label='Objetivo 98 %')
+for b, acc, hi in zip(barras_all, todos_accs, todos_hi_err):
+    ax_all.text(b.get_x() + b.get_width() / 2, acc + hi + 0.15,
+                f'{acc:.2f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+ax_all.set_xticks(x_all)
+ax_all.set_xticklabels(todos_labels, fontsize=9)
+ax_all.set_ylabel('Exactitud en prueba (%)', fontsize=11)
+ax_all.set_title('Comparación de todos los modelos — exactitud en prueba\n'
+                 '(IC 95 % bootstrap para base/aug | ±1σ entre folds para CV)',
+                 fontsize=12, fontweight='bold')
+ax_all.set_ylim(min(todos_accs) - 3, 102)
+ax_all.legend(handles=[
+    Patch(color='steelblue',  label='Base (sin augmentación)'),
+    Patch(color='darkorange', label='CON augmentación'),
+    Patch(color='seagreen',   label='K-Fold CV (media ± 1σ folds)'),
+], fontsize=9)
+ax_all.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+plt.savefig(os.path.join(DIR, 'plot_todos_modelos_comparacion.png'), dpi=150)
+plt.show()
+print("Gráfico guardado: plot_todos_modelos_comparacion.png")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Gráfico — Matrices VN/FP/FN/VP por dígito (uno-vs-resto) — 3 modelos
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _graficar_ovr(modelo_r, titulo, nombre_archivo):
+    y_pred_ovr = modelo_r['modelo'].predict(X_test)
+    _, cm_ovr  = reporte(y_test, y_pred_ovr, silent=True)
+
+    fig_ovr, axes_ovr = plt.subplots(2, 5, figsize=(16, 7))
+    fig_ovr.suptitle(
+        f'{titulo}\n'
+        f'(descomposición uno-vs-resto  |  Exactitud = {modelo_r["acc_test"]*100:.2f}%)',
+        fontsize=13, fontweight='bold'
+    )
+    for digito, ax in enumerate(axes_ovr.flat):
+        vp = cm_ovr[digito, digito]
+        fn = cm_ovr[digito, :].sum() - vp
+        fp = cm_ovr[:, digito].sum() - vp
+        vn = cm_ovr.sum() - vp - fn - fp
+
+        cm2      = np.array([[vn, fp], [fn, vp]])
+        umbral_c = cm2.max() / 2
+
+        ax.imshow(cm2, interpolation='nearest', cmap='Blues')
+        ax.set_title(f'Dígito {digito}', fontsize=11, fontweight='bold')
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+        ax.set_xticklabels([f'No {digito}', f'Sí {digito}'], fontsize=8)
+        ax.set_yticklabels([f'No {digito}', f'Sí {digito}'], fontsize=8)
+        ax.set_xlabel('Predicción', fontsize=8)
+        ax.set_ylabel('Real', fontsize=8)
+
+        etiq = [['VN', 'FP'], ['FN', 'VP']]
+        for i in range(2):
+            for j in range(2):
+                color = 'white' if cm2[i, j] > umbral_c else 'black'
+                ax.text(j, i, f"{etiq[i][j]}\n{cm2[i, j]}",
+                        ha='center', va='center', fontsize=13, fontweight='bold', color=color)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(DIR, nombre_archivo), dpi=150)
+    plt.show()
+    print(f"Gráfico guardado: {nombre_archivo}")
+
+
+# 1 — Mejor modelo base (sin augmentación)
+_graficar_ovr(
+    mejor,
+    f'Matrices VN/FP/FN/VP — Base (mejor): {mejor["nombre"]}',
+    'plot_confusion_ovr_base.png'
+)
+
+# 2 — Mejor modelo CON augmentación sin decay
+mejor_aug_sin_decay = max(
+    [r for r in resultados_aug if 'decay' not in r['nombre']],
+    key=lambda r: r['acc_test']
+)
+_graficar_ovr(
+    mejor_aug_sin_decay,
+    f'Matrices VN/FP/FN/VP — Aug sin decay (mejor): {mejor_aug_sin_decay["nombre"]}',
+    'plot_confusion_ovr_aug.png'
+)
+
+# 3 — Mejor modelo CON augmentación + decay
+mejor_aug_con_decay = max(
+    [r for r in resultados_aug if 'decay' in r['nombre']],
+    key=lambda r: r['acc_test']
+)
+_graficar_ovr(
+    mejor_aug_con_decay,
+    f'Matrices VN/FP/FN/VP — Aug + decay (mejor): {mejor_aug_con_decay["nombre"]}',
+    'plot_confusion_ovr_decay.png'
+)

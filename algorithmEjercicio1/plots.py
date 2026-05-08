@@ -348,16 +348,114 @@ def graficar_mse_epochs(hist_lin, hist_nolin, save_path):
     """Grafica el MSE vs Épocas para ambos modelos durante el entrenamiento."""
     fig, ax = plt.subplots(figsize=(9, 5))
     epochs = np.arange(1, len(hist_lin) + 1)
-    
+
     ax.plot(epochs, hist_lin, 'o-', color='steelblue', label='Perceptrón Lineal')
     ax.plot(epochs, hist_nolin, 's-', color='crimson', label='Perceptrón No Lineal')
-    
+
     ax.set_title('Evolución del MSE durante el Entrenamiento', fontsize=13, fontweight='bold')
     ax.set_xlabel('Época', fontsize=11)
     ax.set_ylabel('Mean Squared Error (MSE)', fontsize=11)
     ax.legend(fontsize=10)
     ax.grid(alpha=0.3)
-    
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    print(f"Gráfico guardado: {save_path}")
+
+
+def graficar_rmse_epochs(rmse_lin_train, rmse_lin_test,
+                         rmse_nolin_train, rmse_nolin_test,
+                         save_path):
+    """Grafica la evolución del RMSE (train y test) para ambos modelos."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle('Evolución del RMSE — Detección de Fraude',
+                 fontsize=14, fontweight='bold')
+
+    epochs = np.arange(1, len(rmse_lin_train) + 1)
+
+    ax1.plot(epochs, rmse_lin_train, 'o-', color='steelblue', label='train')
+    ax1.plot(epochs, rmse_lin_test,  's-', color='crimson',   label='test')
+    ax1.set_title('Perceptrón Lineal', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('Época', fontsize=11)
+    ax1.set_ylabel('RMSE', fontsize=11)
+    ax1.legend(fontsize=10)
+    ax1.grid(alpha=0.3)
+
+    ax2.plot(epochs, rmse_nolin_train, 'o-', color='steelblue', label='train')
+    ax2.plot(epochs, rmse_nolin_test,  's-', color='crimson',   label='test')
+    ax2.set_title('Perceptrón No Lineal', fontsize=12, fontweight='bold')
+    ax2.set_xlabel('Época', fontsize=11)
+    ax2.set_ylabel('RMSE', fontsize=11)
+    ax2.legend(fontsize=10)
+    ax2.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    print(f"Gráfico guardado: {save_path}")
+
+
+def graficar_confusion_kd(y_big_binary, y_tiny_binary, umbral, acuerdo, save_path):
+    """Matriz de confusion TinyModel vs BigModel (Knowledge Distillation)."""
+    tp = np.sum((y_tiny_binary == 1) & (y_big_binary == 1))
+    tn = np.sum((y_tiny_binary == 0) & (y_big_binary == 0))
+    fp = np.sum((y_tiny_binary == 1) & (y_big_binary == 0))
+    fn = np.sum((y_tiny_binary == 0) & (y_big_binary == 1))
+    cm = np.array([[tn, fp], [fn, tp]])
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    im = ax.imshow(cm, interpolation='nearest', cmap='Blues')
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    ax.set_title(f'Matriz de Confusión — TinyModel vs BigModel\n'
+                 f'Umbral = {umbral:.2f}  |  Acuerdo = {acuerdo*100:.1f} %',
+                 fontsize=12, fontweight='bold')
+    ax.set_xlabel('TinyModel (predicción)', fontsize=11)
+    ax.set_ylabel('BigModel (referencia)', fontsize=11)
+    ax.set_xticks([0, 1])
+    ax.set_yticks([0, 1])
+    ax.set_xticklabels(['No Fraude (0)', 'Fraude (1)'], fontsize=10)
+    ax.set_yticklabels(['No Fraude (0)', 'Fraude (1)'], fontsize=10)
+
+    etiquetas = [['VN', 'FP'], ['FN', 'VP']]
+    umbral_color = cm.max() / 2
+    for i in range(2):
+        for j in range(2):
+            color = 'white' if cm[i, j] > umbral_color else 'black'
+            ax.text(j, i, f"{etiquetas[i][j]}\n{cm[i, j]}",
+                    ha='center', va='center', fontsize=14, fontweight='bold', color=color)
+
+    nota = (f"VP: TinyModel replica fraude de BigModel\n"
+            f"VN: TinyModel replica no-fraude de BigModel\n"
+            f"FP: TinyModel detecta fraude que BigModel no marcó\n"
+            f"FN: TinyModel pierde fraude que BigModel marcó")
+    fig.text(0.5, -0.08, nota, ha='center', fontsize=8.5, color='dimgray',
+             bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.6))
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    print(f"Gráfico guardado: {save_path}")
+
+
+def graficar_acuerdo_umbral(umbrales, acuerdos, umbral_optimo, save_path):
+    """Porcentaje de clasificaciones idénticas al BigModel según el umbral."""
+    acuerdos_pct = np.array(acuerdos) * 100
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(umbrales, acuerdos_pct, color='steelblue', lw=2)
+    ax.axvline(umbral_optimo, color='crimson', linestyle='--', lw=1.5,
+               label=f'Umbral óptimo = {umbral_optimo:.2f}  ({acuerdos_pct[np.argmax(acuerdos)]:.1f} %)')
+    ax.axvline(0.5, color='gray', linestyle=':', lw=1.2,
+               label=f'Umbral 0.50  ({acuerdos_pct[np.argmin(np.abs(umbrales - 0.5))]:.1f} %)')
+    ax.axhline(100, color='seagreen', linestyle='--', lw=1, alpha=0.5, label='100 % = idéntico al BigModel')
+
+    ax.set_title('Acuerdo con BigModel según el umbral de decisión\n'
+                 '(100 % = mismas decisiones binarias que BigModel)',
+                 fontsize=12, fontweight='bold')
+    ax.set_xlabel('Umbral de decisión', fontsize=11)
+    ax.set_ylabel('Clasificaciones idénticas al BigModel (%)', fontsize=11)
+    ax.set_ylim(0, 105)
+    ax.legend(fontsize=10)
+    ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     print(f"Gráfico guardado: {save_path}")
