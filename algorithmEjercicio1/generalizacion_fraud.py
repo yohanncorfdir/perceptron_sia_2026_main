@@ -37,7 +37,7 @@ X = df.drop(columns=['flagged_fraud', 'big_model_fraud_probability']).values.ast
 y = df['big_model_fraud_probability'].values.astype(float)
 y_binary = df['flagged_fraud'].values.astype(int)
 
-X = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0) + 1e-8)
+# (X se normalizará dentro de cada fold/split para evitar data leakage)
 
 # Calidad del BigModel (K-Fold completo)
 r2_big = plots.r2_score(y_binary, y)
@@ -75,9 +75,15 @@ for k in range(K):
     idx_test  = folds[k]
     idx_train = np.concatenate([folds[i] for i in range(K) if i != k])
 
-    X_train, y_train = X[idx_train], y[idx_train]
-    X_test,  y_test  = X[idx_test],  y[idx_test]
-    y_test_binary    = y_binary[idx_test]
+    X_train_raw, y_train = X[idx_train], y[idx_train]
+    X_test_raw,  y_test  = X[idx_test],  y[idx_test]
+    y_test_binary        = y_binary[idx_test]
+
+    # Normalización local por fold (evitando data leakage)
+    cv_min = X_train_raw.min(axis=0)
+    cv_max = X_train_raw.max(axis=0)
+    X_train = (X_train_raw - cv_min) / (cv_max - cv_min + 1e-8)
+    X_test  = (X_test_raw  - cv_min) / (cv_max - cv_min + 1e-8)
 
     modelo = PerceptronNoLineal(X_train.shape[1], alpha=0.1)
     modelo.fit(X_train, y_train, epochs=EPOCHS)
@@ -110,9 +116,15 @@ print(f"{'Std':<6} {resultados[:,0].std():<10.4f} "
 # MEJOR MODELO 
 # Entrenamos el modelo final sobre el 80% y evaluamos el umbral en el 20%
 split    = int(0.8 * len(X))
-X_train, X_test = X[:split], X[split:]
+X_train_raw, X_test_raw = X[:split], X[split:]
 y_train, y_test = y[:split], y[split:] # Target continuo para train
 y_test_real = y_binary[split:]         # Ground truth para evaluacion
+
+# Normalización final para evaluación (evitando data leakage)
+f_min = X_train_raw.min(axis=0)
+f_max = X_train_raw.max(axis=0)
+X_train = (X_train_raw - f_min) / (f_max - f_min + 1e-8)
+X_test  = (X_test_raw  - f_min) / (f_max - f_min + 1e-8)
 
 modelo_final = PerceptronNoLineal(X_train.shape[1], alpha=0.1)
 modelo_final.fit(X_train, y_train, epochs=EPOCHS)

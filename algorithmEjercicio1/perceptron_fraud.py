@@ -17,20 +17,22 @@ X = df.drop(columns=['flagged_fraud','big_model_fraud_probability']).values.asty
 y = df['big_model_fraud_probability'].values.astype(float)
 y_binary = df['flagged_fraud'].values.astype(int)
 
-# Preprocesamiento: Min-Max Scaling
-# Normalizamos los datos de entrada al rango [0, 1] para mejorar la estabilidad
-# y convergencia de los gradientes en el perceptrón.
-X_min = X.min(axis=0)
-X_max = X.max(axis=0)
-X = (X - X_min) / (X_max - X_min + 1e-8)
-
-# Division train/test (80 % / 20 %)
+# --- Division train/test (80 % / 20 %) ---
 np.random.seed(42)
 idx_perm = np.random.permutation(len(X))
 split = int(0.8 * len(X))
 idx_train, idx_test = idx_perm[:split], idx_perm[split:]
-X_train, y_train = X[idx_train], y[idx_train]
-X_test,  y_test  = X[idx_test],  y[idx_test]
+
+X_train_raw, X_test_raw = X[idx_train], X[idx_test]
+y_train, y_test = y[idx_train], y[idx_test]
+
+# Preprocesamiento: Min-Max Scaling (evitando data leakage)
+# Normalizamos los datos de entrada al rango [0, 1] usando los parámetros de TRAIN
+X_min = X_train_raw.min(axis=0)
+X_max = X_train_raw.max(axis=0)
+
+X_train = (X_train_raw - X_min) / (X_max - X_min + 1e-8)
+X_test  = (X_test_raw  - X_min) / (X_max - X_min + 1e-8)
 
 EPOCHS = 30
 print(f"Conjunto de datos: {len(X)} muestras, {X.shape[1]} variables de entrada")
@@ -130,8 +132,14 @@ for k in range(K):
     idx_val   = folds[k]
     idx_cv_tr = np.concatenate([folds[j] for j in range(K) if j != k])
 
-    X_cv_train, y_cv_train = X[idx_cv_tr], y[idx_cv_tr]
-    X_cv_val,   y_cv_val   = X[idx_val],   y[idx_val]
+    X_cv_train_raw, y_cv_train = X[idx_cv_tr], y[idx_cv_tr]
+    X_cv_val_raw,   y_cv_val   = X[idx_val],   y[idx_val]
+
+    # Normalización local por fold para evitar data leakage
+    cv_min = X_cv_train_raw.min(axis=0)
+    cv_max = X_cv_train_raw.max(axis=0)
+    X_cv_train = (X_cv_train_raw - cv_min) / (cv_max - cv_min + 1e-8)
+    X_cv_val   = (X_cv_val_raw   - cv_min) / (cv_max - cv_min + 1e-8)
 
     m_lin  = PerceptronLineal(X_cv_train.shape[1],  alpha=0.1)
     m_nlin = PerceptronNoLineal(X_cv_train.shape[1], alpha=0.1)
